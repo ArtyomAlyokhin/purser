@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Поиск картинок в Excel файле</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #3e8e41;
+        }
+
+        #result {
+            font-weight: bold;
+            color: green;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Поиск картинок в Excel файле</h1>
+    <form>
+        <label for="excelFile">Выберите файл Excel:</label>
+        <input type="file" id="excelFile" name="excelFile">
+
+
+        <button type="button" onclick="searchImages()">Найти картинки</button>
+    </form>
+
+
+    <div id="result"></div>
+
+    <script>
+        function searchImages() {
+            // Получение выбранного файла Excel из формы
+            var file = document.getElementById("excelFile").files[0];
+
+            if (file) {
+                var reader = new FileReader();
+
+                reader.onload = function (e) {
+                    // Чтение файла Excel и получение списка артикулов товаров
+                    var data = e.target.result;
+                    var workbook = XLSX.read(data, { type: 'binary' });
+                    var sheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[sheetName];
+                    var range = XLSX.utils.decode_range(worksheet['!ref']);
+                    var articleList = [];
+
+                    for (var R = range.s.r; R <= range.e.r; ++R) {
+                        var cellAddress = { c: 0, r: R };
+                        var cellRef = XLSX.utils.encode_cell(cellAddress);
+                        var cell = worksheet[cellRef];
+
+                        if (cell && cell.t === 's') {
+                            articleList.push(cell.v);
+                        }
+                    }
+
+                    // Для каждого артикула товара выполнение поиска картинки в Интернете
+                    for (var i = 0; i < articleList.length; i++) {
+                        var article = articleList[i];
+                        var url = "<https://www.google.com/search?q=>" + article + "&tbm=isch";
+
+                        fetch(url)
+                            .then(response => response.text())
+                            .then(data => {
+                                var parser = new DOMParser();
+                                var htmlDoc = parser.parseFromString(data, 'text/html');
+                                var imageUrl = htmlDoc.querySelector('img').src;
+
+                                // Вставка найденной картинки в файл Excel, напротив соответствующего артикула
+                                var cellAddress = { c: 1, r: i + 1 };
+                                var cellRef = XLSX.utils.encode_cell(cellAddress);
+                                worksheet[cellRef] = { t: 's', v: imageUrl };
+
+                                // Сохранение измененного файла Excel
+                                var wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+                                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), "output.xlsx");
+                            })
+                            .catch(error => console.log(error))
+                    }
+
+                    document.getElementById("result").innerHTML = "Картинки найдены и добавлены в файл Excel";
+                }
+
+                reader.readAsBinaryString(file);
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
